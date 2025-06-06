@@ -108,11 +108,53 @@ if menu == "Cadastrar Dispositivo":
         add_device(ip, mac, name)
 
 elif menu == "Dispositivos Cadastrados":
-    st.subheader("Dispositivos cadastrados")
+    st.subheader("Dispositivos Cadastrados")
     devices = view_devices()
+    
     if devices:
-        df = pd.DataFrame(devices, columns=["Nome", "IP", "MAC"])
-        st.dataframe(df)
+        # Cria 4 colunas (ajuste os valores conforme necessidade)
+        col1, col2, col3, col4 = st.columns([3, 2, 3, 2])
+        
+        # Cabeçalho
+        with col1:
+            st.markdown("**Nome**")
+        with col2:
+            st.markdown("**IP**")
+        with col3:
+            st.markdown("**MAC**")
+        
+        st.divider()  # Linha separadora
+        
+        # Linhas com dispositivos
+        for name, ip, mac in devices:
+            col1, col2, col3, col4 = st.columns([3, 2, 3, 2])
+            
+            with col1:
+                st.text(name)
+            with col2:
+                st.text(ip)
+            with col3:
+                st.text(mac)
+            with col4:
+                if st.button("Remover", key=f"rm_{ip}", help="Remover dispositivo"):
+                    st.session_state['ip_to_remove'] = ip
+        
+        # Confirmação (aparece apenas se um IP foi selecionado)
+        if 'ip_to_remove' in st.session_state:
+            st.warning("Tem certeza que deseja remover este dispositivo?")
+            
+            confirm_col1, confirm_col2, _ = st.columns([1, 1, 4])
+            with confirm_col1:
+                if st.button("Sim"):
+                    with get_db() as conn:
+                        conn.execute("DELETE FROM devices WHERE ip_address = ?", (st.session_state['ip_to_remove'],))
+                    st.success("Removido!")
+                    del st.session_state['ip_to_remove']
+                    st.experimental_rerun()
+            with confirm_col2:
+                if st.button("Não"):
+                    del st.session_state['ip_to_remove']
+    
     else:
         st.info("Nenhum dispositivo cadastrado ainda.")
 
