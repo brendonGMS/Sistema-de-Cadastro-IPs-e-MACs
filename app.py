@@ -51,32 +51,41 @@ def add_device(ip, mac, name):
         except sqlite3.IntegrityError:
             st.warning("Este IP já está cadastrado.")
 
+def importar_dados_df(df):
+    inseridos = 0
+    # Normaliza as colunas
+    df.columns = [normalize_col_name(col) for col in df.columns]
+
+    if all(col in df.columns for col in ['ip', 'mac', 'nome']):
+        with get_db() as conn:
+            for _, row in df.iterrows():
+                ip = str(row['ip']).strip()
+                mac = str(row['mac']).strip()
+                nome = str(row['nome']).strip()
+                if is_valid_ip(ip) and is_valid_mac(mac) and nome:
+                    try:
+                        conn.execute(
+                            "INSERT INTO devices (ip_address, mac_address, name) VALUES (?, ?, ?)",
+                            (ip, mac, nome)
+                        )
+                        inseridos += 1
+                    except sqlite3.IntegrityError:
+                        continue
+        st.success(f"Importação concluída: {inseridos} dispositivo(s) inserido(s).")
+    else:
+        st.warning("Colunas obrigatórias não encontradas: ip, mac, nome.")
+
 def importar_dados_csv(csv_url):
     try:
-        df = pd.read_csv(csv_url)
-
-        # Normaliza as colunas
-        df.columns = [normalize_col_name(col) for col in df.columns]
-
-        if all(col in df.columns for col in ['ip', 'mac', 'nome']):
-            with get_db() as conn:
-                for _, row in df.iterrows():
-                    ip = str(row['ip']).strip()
-                    mac = str(row['mac']).strip()
-                    nome = str(row['nome']).strip()
-                    if is_valid_ip(ip) and is_valid_mac(mac) and nome:
-                        try:
-                            conn.execute(
-                                "INSERT INTO devices (ip_address, mac_address, name) VALUES (?, ?, ?)",
-                                (ip, mac, nome)
-                            )
-                        except sqlite3.IntegrityError:
-                            continue
-            st.success("Planilha importada com sucesso!")
-        else:
-            st.warning("Colunas obrigatórias não encontradas: ip, mac, nome.")
+        # Tenta ler com vírgula primeiro
+        try:
+            df = pd.read_csv(csv_url)
+        except:
+            df = pd.read_csv(csv_url, sep=';')
+        importar_dados_df(df)
     except Exception as e:
         st.warning(f"Erro ao importar CSV: {e}")
+
 
 def view_devices():
     with get_db() as conn:
@@ -88,7 +97,7 @@ st.set_page_config(page_title="Cadastro de IPs e MACs", layout="centered")
 st.title("Cadastro de IPs e MACs")
 init_db()
 
-menu = st.sidebar.radio("Menu", ["Cadastrar Dispositivo", "Dispositivos Cadastrados", "Importar Planilha (CSV via link)"])
+menu = st.sidebar.radio("Menu", ["Cadastrar Dispositivo", "Dispositivos Cadastrados", "Importar Planilha (CSV via link ou arquivo)"])
 
 if menu == "Cadastrar Dispositivo":
     st.subheader("Novo dispositivo")
@@ -107,8 +116,36 @@ elif menu == "Dispositivos Cadastrados":
     else:
         st.info("Nenhum dispositivo cadastrado ainda.")
 
-elif menu == "Importar Planilha (CSV via link)":
-    st.subheader("Importar planilha via link do Google Sheets (formato CSV)")
-    csv_url = st.text_input("Cole aqui o link direto do CSV (Google Sheets: Arquivo > Compartilhar > Publicar na web > CSV)")
-    if st.button("Importar"):
-        importar_dados_csv(csv_url)
+elif menu == "Importar Planilha (CSV via link ou arquivo)":
+    st.subheader("Importar planilha (CSV)")
+
+    import_type = st.radio("Tipo de importação", ["Arquivo CSV local", "Link de CSV da web"])
+
+    if import_type == "Arquivo CSV local":
+        uploaded_file = st.file_uploader("Escolha um arquivo .csv", type=["csv"])
+        if uploaded_file is not None:
+            try:
+                # Tenta com vírgula primeiro
+                try:
+                    df = pd.read_csv(uploaded_file)
+                except:
+                    df = pd.read_csv(uploaded_file, sep=';')
+
+                df.columns = [normalize_col_name(col) for col in df.columns]
+                st.write("Pré-visualização da planilha:")
+                st.dataframe(df.head())
+
+                if all(col in df.columns for col in ['ip', 'mac', 'nome']):
+                    if st.button("Importar"):
+                        importar_dados_df(df)
+                else:
+                    st.warning("A planilha deve conter as colunas: ip, mac, nome.")
+            except Exception as e:
+                st.warning(f"Erro ao ler o arquivo CSV: {e}")
+
+    elif import_type == "Link de CSV da web":
+        csv_url = st.text_input("Cole aqui o link direto do CSV (Google Sheets publicado como CSV)")
+        if csv_url:
+            if st.button("Importar via link"):
+                importar_dados_csv(csv_url)
+
