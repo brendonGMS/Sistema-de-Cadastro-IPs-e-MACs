@@ -111,6 +111,16 @@ elif menu == "Dispositivos Cadastrados":
     st.subheader("Dispositivos Cadastrados")
     devices = view_devices()
     
+    search_term = st.text_input("🔍 Filtrar por nome, IP ou MAC", placeholder="Digite para buscar...")
+    if search_term:
+        search_lower = search_term.lower()
+        devices = [
+            (name, ip, mac) for (name, ip, mac) in devices 
+            if (search_lower in name.lower()) 
+            or (search_lower in ip.lower()) 
+            or (search_lower in mac.lower())
+        ]
+    
     if devices:
         # Cria 4 colunas (ajuste os valores conforme necessidade)
         col1, col2, col3, col4 = st.columns([3, 2, 3, 2])
