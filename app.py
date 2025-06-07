@@ -111,7 +111,7 @@ elif menu == "Dispositivos Cadastrados":
     st.subheader("Dispositivos Cadastrados")
     devices = view_devices()
     
-    search_term = st.text_input("🔍 Filtrar por nome, IP ou MAC", placeholder="Digite para buscar...")
+    search_term = st.text_input("Filtrar por nome, IP ou MAC", placeholder="Digite para buscar...")
     if search_term:
         search_lower = search_term.lower()
         devices = [
